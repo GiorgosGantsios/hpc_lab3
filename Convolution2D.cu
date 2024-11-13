@@ -5,6 +5,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 unsigned int filter_radius;
 
@@ -53,15 +54,32 @@ __global__ void convolutionRowGPU(float *d_Dst, float *d_Src, float *d_Filter,
   int y = index / imageW; // row
   int x = index % imageW; // col
   float sum = 0;
-
-  for(int k = -filterR; k <= filterR; k++){
-    int d = x + k;
-
-    if(d >= 0 && d < imageW)
-      sum += d_Src[y * imageW + d] * d_Filter[filterR - k];
+  // printf("Blockidx.x: %d, BlockDim.x: %d, threadIdx.x: %d\n", blockIdx.x, blockDim.x, threadIdx.x);
+  if(x < imageW && y < imageH){
+    for(int k = -filterR; k <= filterR; k++){
+      int d = x + k;
+      if(d >= 0 && d < imageW)
+        sum += d_Src[y * imageW + d] * d_Filter[filterR - k];
+    }
+    d_Dst[index] = sum;
   }
+}
 
-  d_Dst[index] = sum;
+__global__ void convolutionColGPU(float *d_Dst, float *d_Src, float *d_Filter, 
+  int imageW, int imageH, int filterR) {
+  
+  int index = blockIdx.x*blockDim.x + threadIdx.x;
+  int y = index / imageW; // row
+  int x = index % imageW; // col
+  float sum = 0;
+  if(x < imageW && y < imageH){
+    for(int k = -filterR; k <= filterR; k++){
+      int d = y + k;
+      if(d >= 0 && d < imageH)
+        sum += d_Src[d * imageW + x] * d_Filter[filterR - k];
+    }
+    d_Dst[index] = sum;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -90,23 +108,7 @@ void convolutionColumnCPU(float *h_Dst, float *h_Src, float *h_Filter,
     
 }
 
-__global__ void convolutionColGPU(float *d_Dst, float *d_Src, float *d_Filter, 
-  int imageW, int imageH, int filterR) {
-  
-  int index = blockIdx.x*blockDim.x + threadIdx.x;
-  int y = index / imageW; // row
-  int x = index % imageW; // col
-  float sum = 0;
 
-  for(int k = -filterR; k <= filterR; k++){
-    int d = y + k;
-
-    if(d >= 0 && d < imageH)
-      sum += d_Src[d * imageW + x] * d_Filter[filterR - k];
-  }
-
-  d_Dst[index] = sum;
-}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -127,7 +129,12 @@ int main(int argc, char **argv) {
 
     int imageW;
     int imageH;
+    int extra_block;  // used to indicate if an extra block is needed (if image size is not divisible by 1024)
     unsigned int i;
+
+    cudaError_t e;
+    clock_t start, end;
+
 
 	  printf("Enter filter radius : ");
 	  // scanf("%d", &filter_radius);
@@ -145,6 +152,7 @@ int main(int argc, char **argv) {
       printf("ERROR: scanf: FILE: %s, LINE: %d\n", __FILE__, __LINE__);
     }
     imageH = imageW;
+    extra_block = ((imageH*imageW)%1024 != 0);
 
     printf("Image Width x Height = %i x %i\n\n", imageW, imageH);
     printf("Allocating and initializing host arrays...\n");
@@ -159,7 +167,6 @@ int main(int argc, char **argv) {
       printf("ERROR on Host Allocation!\n");
       goto cleanup;
     }
-
     // to 'h_Filter' apotelei to filtro me to opoio ginetai to convolution kai
     // arxikopoieitai tuxaia. To 'h_Input' einai h eikona panw sthn opoia ginetai
     // to convolution kai arxikopoieitai kai auth tuxaia.
@@ -187,21 +194,48 @@ int main(int argc, char **argv) {
     // To parakatw einai to kommati pou ekteleitai sthn CPU kai me vash auto prepei na ginei h sugrish me thn GPU.
     printf("CPU computation...\n");
 
+    start = clock();
     convolutionRowCPU(h_Buffer, h_Input, h_Filter, imageW, imageH, filter_radius); // convolution kata grammes
     convolutionColumnCPU(h_OutputCPU, h_Buffer, h_Filter, imageW, imageH, filter_radius); // convolution kata sthles
-
+    end = clock();
+    printf("CPU time: %ld\n", end - start);
     printf("GPU computation...\n");
 
-    convolutionRowGPU<<<1, imageH*imageW>>>(d_Buffer, d_Input, d_Filter, imageW, imageH, filter_radius);
+    // 1st Kernel launch
+    // No need for sync barrier because cudaMemCpy(..., hostToDevice) works as barrier
+    start = clock();
+    printf("1st Kernel Launch: Row Conolution: ");
+    convolutionRowGPU<<<(imageH*imageW)/1024+extra_block, 1024>>>(d_Buffer, d_Input, d_Filter, imageW, imageH, filter_radius);
     cudaDeviceSynchronize();
+    e = cudaGetLastError();
+    if(e!=cudaSuccess){
+      printf("ERROR: %s, FILE: %s, LINE: %d\n", cudaGetErrorString(e), __FILE__, __LINE__);
+      goto cleanup;
+    }
+    else{
+      printf("cudaGetLastError() == cudaSuccess!\n");
+    }
 
-    convolutionColGPU<<<1, imageH*imageW>>>(d_Output, d_Buffer, d_Filter, imageW, imageH, filter_radius);
+    // 2nd Kernel launch
+    // Synchronize between 2 kernels launch because Column kernel needs the d_Buffer as input.
+    // d_Buffer works as intermediate result so we ensure it is completely written.
+
+    printf("2nd Kernel Launch: Col Conolution: ");
+    convolutionColGPU<<<(imageH*imageW)/1024+extra_block, 1024>>>(d_Output, d_Buffer, d_Filter, imageW, imageH, filter_radius);
     cudaDeviceSynchronize();
+    e = cudaGetLastError();
+    if(e!=cudaSuccess){
+      printf("ERROR: %s, FILE: %s, LINE: %d\n", cudaGetErrorString(e), __FILE__, __LINE__);
+      goto cleanup;
+    }
+    else{
+      printf("cudaGetLastError() == cudaSuccess!\n");
+    }
+    end = clock();
+    printf("GPU time: %ld\n", end - start);
 
     CHECK_CUDA_ERROR(cudaMemcpy(h_OutputGPU, d_Output, imageW * imageH * sizeof(float), cudaMemcpyDeviceToHost));
     
-
-
     // Kanete h sugrish anamesa se GPU kai CPU kai an estw kai kapoio apotelesma xeperna thn akriveia
     // pou exoume orisei, tote exoume sfalma kai mporoume endexomenws na termatisoume to programma mas  
     for (i = 0; i < imageW * imageH; i++) {
@@ -210,9 +244,6 @@ int main(int argc, char **argv) {
           goto cleanup;
         }
     }
-
-
-
 
 cleanup:
     // free all the allocated memory
@@ -230,10 +261,10 @@ cleanup:
     if (d_Filter) cudaFree(d_Filter);
     
     // Do a device reset just in case... Bgalte to sxolio otan ylopoihsete CUDA
-    printf("Reset Device");
+    printf("Reset Device: ");
 
     cudaDeviceSynchronize();
-    cudaError_t e = cudaGetLastError();
+    e = cudaGetLastError();
     if(e!=cudaSuccess){
       printf("ERROR: %s, FILE: %s, LINE: %d\n", cudaGetErrorString(e), __FILE__, __LINE__);
     }
