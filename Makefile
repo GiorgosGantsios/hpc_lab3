@@ -1,5 +1,5 @@
 NVCC = nvcc
-CFLAGS = -g -G -O4
+CFLAGS = -g -O4
 
 TARGET = Convolution2D
 
@@ -17,10 +17,10 @@ clean:
 
 
 experiment_12: $(TARGET)
-	@echo "Running $(TARGET) 12 times and writing output to $(LOG_FILE)"
-	@rm -f $(LOG_FILE)  # Remove existing log file, if any
+	@echo "Running $(TARGET) 12 times with filter radius $(FILTER_RADIUS) and image size $(IMAGE_SIZE), writing output to $(LOG_FILE)"
+	@rm -f $(LOG_FILE)
 	@for i in {1..12}; do \
-		echo "Run $$i:" >> $(LOG_FILE); \
-		./$(TARGET) >> $(LOG_FILE); \
-		echo "" >> $(LOG_FILE); \
-	done
+    	echo "Run $$i:" >> $(LOG_FILE); \
+    	./$(TARGET) $(FILTER_RADIUS) $(IMAGE_SIZE) >> $(LOG_FILE); \
+    	echo "" >> $(LOG_FILE); \
+    done

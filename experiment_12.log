@@ -1,0 +1,168 @@
+Run 1:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 43048.770000 msec
+GPU computation...
+GPU Time: 2562.728516 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 2:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 42862.653000 msec
+GPU computation...
+GPU Time: 2470.577148 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 3:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41467.264000 msec
+GPU computation...
+GPU Time: 2518.181885 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 4:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41260.425000 msec
+GPU computation...
+GPU Time: 2530.990234 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 5:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41504.192000 msec
+GPU computation...
+GPU Time: 2525.691650 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 6:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41306.988000 msec
+GPU computation...
+GPU Time: 2529.266602 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 7:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41421.372000 msec
+GPU computation...
+GPU Time: 2529.654785 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 8:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41292.915000 msec
+GPU computation...
+GPU Time: 2498.320557 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 9:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 43273.574000 msec
+GPU computation...
+GPU Time: 2556.500732 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 10:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 43020.612000 msec
+GPU computation...
+GPU Time: 2520.145264 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 11:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41471.233000 msec
+GPU computation...
+GPU Time: 2501.635986 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
+Run 12:
+Enter filter radius : Enter image size. Should be a power of two and greater than 33 : Image Width x Height = 16384 x 16384
+
+Allocating and initializing host arrays...
+Allocating GPU memory...
+CPU computation...
+CPU time: 41759.151000 msec
+GPU computation...
+GPU Time: 2525.895996 msec
+Deallocating host memory
+Deallocating device memory
+Destroying CUDA events
+Reset Device: cudaGetLastError() == cudaSuccess!
+
