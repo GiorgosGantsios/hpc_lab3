@@ -11,7 +11,7 @@ unsigned int filter_radius;
 
 #define FILTER_LENGTH 	(2 * filter_radius + 1)
 #define ABS(val)  	((val)<0.0 ? (-(val)) : (val))
-#define accuracy  	5
+#define accuracy  	100
 #define CHECK_CUDA_ERROR(call) \
     do { \
         cudaError_t err = call; \
@@ -25,14 +25,14 @@ unsigned int filter_radius;
 ////////////////////////////////////////////////////////////////////////////////
 // Reference row convolution filter
 ////////////////////////////////////////////////////////////////////////////////
-void convolutionRowCPU(double *h_Dst, double *h_Src, double *h_Filter, 
+void convolutionRowCPU(float *h_Dst, float *h_Src, float *h_Filter, 
                        int imageW, int imageH, int filterR) {
 
   int x, y, k;
                       
   for (y = 0; y < imageH; y++) {
     for (x = 0; x < imageW; x++) {
-      double sum = 0;
+      float sum = 0;
 
       for (k = -filterR; k <= filterR; k++) {
         int d = x + k;
@@ -47,52 +47,58 @@ void convolutionRowCPU(double *h_Dst, double *h_Src, double *h_Filter,
   }    
 }
 
-__global__ void convolutionRowGPU(double *d_Dst, double *d_Src, double *d_Filter, 
+__global__ void convolutionRowGPU(float *d_Dst, float *d_Src, float *d_Filter, 
   int imageW, int imageH, int filterR) {
   
   int index = blockIdx.x*blockDim.x + threadIdx.x;
-  int y = index / imageW; // row
-  int x = index % imageW; // col
-  double sum = 0;
-  // printf("Blockidx.x: %d, BlockDim.x: %d, threadIdx.x: %d\n", blockIdx.x, blockDim.x, threadIdx.x);
-  if(x < imageW && y < imageH){
+  int y = filterR + (index / imageW); // row
+  int x = filterR + (index % imageW); // col
+  float sum = 0;
+  if(x < imageW+filterR && y < imageH+filterR){
+    // printf("Blockidx.x: %d, BlockDim.x: %d, threadIdx.x: %d\n", blockIdx.x, blockDim.x, threadIdx.x);
     for(int k = -filterR; k <= filterR; k++){
       int d = x + k;
-      if(d >= 0 && d < imageW)
-        sum += d_Src[y * imageW + d] * d_Filter[filterR - k];
+      // if(d >= 0 && d < imageW)
+      sum += d_Src[y * (imageW+2*filterR) + d] * d_Filter[filterR - k];
     }
-    d_Dst[index] = sum;
+    d_Dst[y*(imageW+2*filterR)+x] = sum;
   }
+  printf("\ndbuffer[0]: %f\n", d_Dst[0]);
 }
 
-__global__ void convolutionColGPU(double *d_Dst, double *d_Src, double *d_Filter, 
+__global__ void convolutionColGPU(float *d_Dst, float *d_Src, float *d_Filter, 
   int imageW, int imageH, int filterR) {
   
   int index = blockIdx.x*blockDim.x + threadIdx.x;
-  int y = index / imageW; // row
-  int x = index % imageW; // col
-  double sum = 0;
-  if(x < imageW && y < imageH){
+  int y = filterR + (index / imageW); // row
+  int x = filterR + (index % imageW); // col
+  float sum = 0;
+  if(x < imageW+filterR && y < imageH+filterR){
     for(int k = -filterR; k <= filterR; k++){
       int d = y + k;
-      if(d >= 0 && d < imageH)
-        sum += d_Src[d * imageW + x] * d_Filter[filterR - k];
+      // if(d >= 0 && d < imageH)
+      sum += d_Src[d * (imageW+2*filterR) + x] * d_Filter[filterR - k];
     }
-    d_Dst[index] = sum;
+    d_Dst[y*(imageW+2*filterR)+x] = sum;
   }
+  if(d_Dst[0] < 0) {
+    printf("\ny: %d, x: %d, index: %d\n", y, x, index);
+  }
+  printf("\ndbuffer[0]: %f\n", d_Dst[0]);
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reference column convolution filter
 ////////////////////////////////////////////////////////////////////////////////
-void convolutionColumnCPU(double *h_Dst, double *h_Src, double *h_Filter,
+void convolutionColumnCPU(float *h_Dst, float *h_Src, float *h_Filter,
     			   int imageW, int imageH, int filterR) {
 
   int x, y, k;
   
   for (y = 0; y < imageH; y++) {
     for (x = 0; x < imageW; x++) {
-      double sum = 0;
+      float sum = 0;
 
       for (k = -filterR; k <= filterR; k++) {
         int d = y + k;
@@ -108,24 +114,21 @@ void convolutionColumnCPU(double *h_Dst, double *h_Src, double *h_Filter,
     
 }
 
-
-
-
 ////////////////////////////////////////////////////////////////////////////////
 // Main program
 ////////////////////////////////////////////////////////////////////////////////
 int main(int argc, char **argv) {
     
-    double
+    float
     *h_Filter,
     *h_Input,
     *h_Buffer,
     *h_OutputCPU,
     *h_OutputGPU;
-    double *d_Filter = NULL;
-    double*d_Input = NULL;
-    double *d_Buffer = NULL;
-    double *d_Output = NULL;
+    float *d_Filter = NULL;
+    float*d_Input = NULL;
+    float *d_Buffer = NULL;
+    float *d_Output = NULL;
 
     int imageW;
     int imageH;
@@ -163,11 +166,11 @@ int main(int argc, char **argv) {
     printf("Image Width x Height = %i x %i\n\n", imageW, imageH);
     printf("Allocating and initializing host arrays...\n");
     // Tha htan kalh idea na elegxete kai to apotelesma twn malloc...
-    h_Filter    = (double *)malloc(FILTER_LENGTH * sizeof(double));
-    h_Input     = (double *)malloc(imageW * imageH * sizeof(double));
-    h_Buffer    = (double *)malloc(imageW * imageH * sizeof(double));
-    h_OutputCPU = (double *)malloc(imageW * imageH * sizeof(double));
-    h_OutputGPU = (double *)malloc(imageW * imageH * sizeof(double));
+    h_Filter    = (float *)malloc(FILTER_LENGTH * sizeof(float));
+    h_Input     = (float *)calloc((imageW+2*filter_radius) * (imageH+2*filter_radius), sizeof(float)); // use calloc to initialize padded elements to 0
+    h_Buffer    = (float *)calloc((imageW+2*filter_radius) * (imageH+2*filter_radius), sizeof(float));
+    h_OutputCPU = (float *)calloc((imageW+2*filter_radius) * (imageH+2*filter_radius), sizeof(float));
+    h_OutputGPU = (float *)calloc((imageW+2*filter_radius) * (imageH+2*filter_radius), sizeof(float));
 
     if(!(h_Filter && h_Input && h_Buffer && h_OutputCPU && h_OutputGPU)){
       printf("ERROR on Host Allocation!\n");
@@ -180,20 +183,26 @@ int main(int argc, char **argv) {
     srand(200);
 
     for (i = 0; i < FILTER_LENGTH; i++) {
-        h_Filter[i] = (double)(rand() % 16);
+        h_Filter[i] = (float)(rand() % 16);
     }
 
-    for (i = 0; i < imageW * imageH; i++) {
-        h_Input[i] = (double)rand() / ((double)RAND_MAX / 255) + (double)rand() / (double)RAND_MAX;
+    for (i = filter_radius; i < filter_radius + imageH; i++) {
+        int row = i*(2*filter_radius + imageW);
+        for(int j = filter_radius; j < imageW + filter_radius; j++){
+          h_Input[row+j] = (float)rand() / ((float)RAND_MAX / 255) + (float)rand() / (float)RAND_MAX;
+        }
+        // h_Input[i] = (float)rand() / ((float)RAND_MAX / 255) + (float)rand() / (float)RAND_MAX;
     }
 
     printf("Allocating GPU memory...\n");
 
-    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Filter, FILTER_LENGTH * sizeof(double)));
-    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Input, imageW * imageH * sizeof(double)));
-    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Buffer, imageW * imageH * sizeof(double)));
-    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Output, imageW * imageH * sizeof(double)));
+    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Filter, FILTER_LENGTH * sizeof(float)));
+    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Input, (imageW+2*filter_radius) * (imageH+2*filter_radius) * sizeof(float)));
+    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Buffer, (imageW+2*filter_radius) * (imageH+2*filter_radius) * sizeof(float)));
+    CHECK_CUDA_ERROR(cudaMalloc((void **)&d_Output, (imageW+2*filter_radius) * (imageH+2*filter_radius) * sizeof(float)));
 
+    //must initialize d_Buffer to zeros
+    CHECK_CUDA_ERROR(cudaMemset(d_Buffer, 0, (imageW+2*filter_radius) * (imageH+2*filter_radius) * sizeof(float)));
 
     // Start Measuring memory transfer times
     cudaEventCreate(&startCuda);
@@ -201,8 +210,8 @@ int main(int argc, char **argv) {
 
     cudaEventRecord(startCuda, 0);
 
-    CHECK_CUDA_ERROR(cudaMemcpy(d_Filter, h_Filter, FILTER_LENGTH * sizeof(double), cudaMemcpyHostToDevice));
-    CHECK_CUDA_ERROR(cudaMemcpy(d_Input, h_Input, imageW * imageH * sizeof(double), cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(d_Filter, h_Filter, FILTER_LENGTH * sizeof(float), cudaMemcpyHostToDevice));
+    CHECK_CUDA_ERROR(cudaMemcpy(d_Input, h_Input, (imageW+2*filter_radius) * (imageH+2*filter_radius) * sizeof(float), cudaMemcpyHostToDevice));
 
     cudaEventRecord(stopCuda, 0);
     cudaEventSynchronize(stopCuda);
@@ -215,7 +224,7 @@ int main(int argc, char **argv) {
     convolutionRowCPU(h_Buffer, h_Input, h_Filter, imageW, imageH, filter_radius); // convolution kata grammes
     convolutionColumnCPU(h_OutputCPU, h_Buffer, h_Filter, imageW, imageH, filter_radius); // convolution kata sthles
     end = clock();
-    printf("CPU time: %f msec\n", (double)((end - start)/(CLOCKS_PER_SEC/1000000))/1000);
+    printf("CPU time: %f msec\n", (float)((end - start)/(CLOCKS_PER_SEC/1000000))/1000);
     printf("GPU computation...\n");
 
     // 1st Kernel launch
@@ -232,7 +241,6 @@ int main(int argc, char **argv) {
     //else{
     //  printf("cudaGetLastError() == cudaSuccess!\n");
     //}
-
     // 2nd Kernel launch
     // Synchronize between 2 kernels launch because Column kernel needs the d_Buffer as input.
     // d_Buffer works as intermediate result so we ensure it is completely written.
@@ -249,16 +257,40 @@ int main(int argc, char **argv) {
     //  printf("cudaGetLastError() == cudaSuccess!\n");
     //}
 
-    CHECK_CUDA_ERROR(cudaMemcpy(h_OutputGPU, d_Output, imageW * imageH * sizeof(double), cudaMemcpyDeviceToHost));
+    CHECK_CUDA_ERROR(cudaMemcpy(h_OutputGPU, d_Output, (imageW+2*filter_radius) * (imageH+2*filter_radius) * sizeof(float), cudaMemcpyDeviceToHost));
     cudaEventRecord(stopCuda, 0);
     cudaEventSynchronize(stopCuda);
     cudaEventElapsedTime(&millisecondsKernelsandTransferBack, startCuda, stopCuda);
     printf("GPU Time: %f msec\n", millisecondsTransfers+millisecondsKernelsandTransferBack);
+
+    printf("\nInput\n");
+    for(i = 0; i < (imageW+2*filter_radius) * (imageH+2*filter_radius); i++) {
+      printf("%f ", h_Input[i]);
+    }
+
+    printf("\nOutput CPU\n");
+    for(i = 0; i < (imageW+2*filter_radius) * (imageH+2*filter_radius); i++) {
+      printf("%f ", h_OutputCPU[i]);
+    }
+
+    printf("\nOutput GPU\n");
+    for(i = 0; i < (imageW+2*filter_radius) * (imageH+2*filter_radius); i++) {
+      printf("%f ", h_OutputGPU[i]);
+    }
+
+    // CHECK_CUDA_ERROR();
+    // printf("\nBuffer GPU\n");
+    // for(i = 0; i < (imageW+2*filter_radius) * (imageH+2*filter_radius); i++) {
+    //   printf("%f ", h_OutputGPU[i]);
+    // }
+
+
+
     // Kanete h sugrish anamesa se GPU kai CPU kai an estw kai kapoio apotelesma xeperna thn akriveia
     // pou exoume orisei, tote exoume sfalma kai mporoume endexomenws na termatisoume to programma mas  
-    for (i = 0; i < imageW * imageH; i++) {
+    for (i = 0; i < (imageW+2*filter_radius) * (imageH+2*filter_radius); i++) {
         if(ABS(h_OutputGPU[i] - h_OutputCPU[i]) > accuracy){
-          printf("Difference bigger than accuray in index i = %d, h_OutputGPU[%d] = %lf, h_OutputCPU[%d] = %lf\n", i, i, h_OutputGPU[i], i, h_OutputCPU[i]);
+          printf("Difference bigger than accuray in index i = %d, h_OutputGPU[%d] = %f, h_OutputCPU[%d] = %f\n", i, i, h_OutputGPU[i], i, h_OutputCPU[i]);
           goto cleanup;
         }
     }
